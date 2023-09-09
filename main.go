@@ -15,11 +15,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type BoundedImage struct {
-	Image  image.Image
-	Bounds image.Rectangle
-}
-
 type ColorfulColor struct {
 	colorful.Color
 }
@@ -70,12 +65,12 @@ func mainAction(c *cli.Context) error {
 		return err
 	}
 
-	boundedImage, err := loadImage(inputImagePath)
+	loadedImage, err := loadImage(inputImagePath)
 	if err != nil {
 		return err
 	}
 
-	mappedImage := image.NewRGBA(boundedImage.Bounds)
+	mappedImage := image.NewRGBA(loadedImage.Bounds())
 
 	mappedColorByColor := sync.Map{}
 	numCPU := runtime.NumCPU()
@@ -86,11 +81,11 @@ func mainAction(c *cli.Context) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			mapImageRows(rowCh, boundedImage, settings, mappedImage, &mappedColorByColor)
+			mapImageRows(rowCh, loadedImage, settings, mappedImage, &mappedColorByColor)
 		}()
 	}
 
-	for y := boundedImage.Bounds.Min.Y; y < boundedImage.Bounds.Max.Y; y++ {
+	for y := loadedImage.Bounds().Min.Y; y < loadedImage.Bounds().Max.Y; y++ {
 		rowCh <- y
 	}
 	close(rowCh)
@@ -135,21 +130,19 @@ func loadSettings(settingsFilePath string) (Settings, error) {
 	return settings, nil
 }
 
-func loadImage(inputImagePath string) (BoundedImage, error) {
+func loadImage(inputImagePath string) (image.Image, error) {
 	inputFile, err := os.Open(inputImagePath)
 	if err != nil {
-		return BoundedImage{}, err
+		return nil, err
 	}
 	defer inputFile.Close()
 
 	img, _, err := image.Decode(inputFile)
 	if err != nil {
-		return BoundedImage{}, err
+		return nil, err
 	}
 
-	boundedImage := BoundedImage{Image: img, Bounds: img.Bounds()}
-
-	return boundedImage, nil
+	return img, nil
 }
 
 func parsePalette(palette []string) []colorful.Color {
@@ -161,16 +154,16 @@ func parsePalette(palette []string) []colorful.Color {
 	return parsedPalette
 }
 
-func mapImageRows(rowCh chan int, boundedImage BoundedImage, settings Settings, mappedImage *image.RGBA, mappedColorByColor *sync.Map) {
+func mapImageRows(rowCh chan int, originalImage image.Image, settings Settings, mappedImage *image.RGBA, mappedColorByColor *sync.Map) {
 	for row := range rowCh {
-		for x := boundedImage.Bounds.Min.X; x < boundedImage.Bounds.Max.X; x++ {
-			pixelColor := boundedImage.Image.At(x, row)
-			mapAndSetPixelColor(pixelColor, boundedImage, settings, x, row, mappedImage, mappedColorByColor)
+		for x := originalImage.Bounds().Min.X; x < originalImage.Bounds().Max.X; x++ {
+			pixelColor := originalImage.At(x, row)
+			mapAndSetPixelColor(pixelColor, originalImage, settings, x, row, mappedImage, mappedColorByColor)
 		}
 	}
 }
 
-func mapAndSetPixelColor(pixelColor color.Color, boundedImage BoundedImage, settings Settings, x, y int, mappedImage *image.RGBA, mappedColorByColor *sync.Map) {
+func mapAndSetPixelColor(pixelColor color.Color, originalImage image.Image, settings Settings, x, y int, mappedImage *image.RGBA, mappedColorByColor *sync.Map) {
 	if mappedColor, ok := mappedColorByColor.Load(pixelColor); ok {
 		mappedImage.Set(x, y, mappedColor.(color.Color))
 		return
