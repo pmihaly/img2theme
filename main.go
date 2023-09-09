@@ -11,6 +11,8 @@ import (
 	"sync"
 
 	"github.com/lucasb-eyer/go-colorful"
+	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v2"
 )
 
 type BoundedImage struct {
@@ -18,16 +20,60 @@ type BoundedImage struct {
 	Bounds image.Rectangle
 }
 
+type ColorfulColor struct {
+	colorful.Color
+}
+
 type Settings struct {
-	Palette         []colorful.Color
-	PaletteAffinity float64
+	Palette         []ColorfulColor `yaml:"palette"`
+	PaletteAffinity float64         `yaml:"palette-affinity"`
 }
 
 func main() {
-	inputImagePath := "input.jpg"
-	outputImagePath := "output.jpg"
+	app := &cli.App{
+		Name:  "ImageMapper",
+		Usage: "Map colors in an image to a specified palette.",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "input",
+				Value: "input.jpg",
+				Usage: "Input image file path",
+			},
+			&cli.StringFlag{
+				Name:  "output",
+				Value: "output.jpg",
+				Usage: "Output image file path",
+			},
+			&cli.StringFlag{
+				Name:  "settings",
+				Value: "settings.yaml",
+				Usage: "Settings YAML file path",
+			},
+		},
+		Action: mainAction,
+	}
 
-	boundedImage, settings := loadImageAndPalette(inputImagePath)
+	err := app.Run(os.Args)
+	if err != nil {
+		fmt.Println(err)
+		cli.Exit(err, 1)
+	}
+}
+
+func mainAction(c *cli.Context) error {
+	inputImagePath := c.String("input")
+	outputImagePath := c.String("output")
+	settingsFilePath := c.String("settings")
+
+	settings, err := loadSettings(settingsFilePath)
+	if err != nil {
+		return err
+	}
+
+	boundedImage, err := loadImage(inputImagePath)
+	if err != nil {
+		return err
+	}
 
 	mappedImage := image.NewRGBA(boundedImage.Bounds)
 
@@ -50,35 +96,60 @@ func main() {
 	close(rowCh)
 	wg.Wait()
 
-	saveMappedImage(outputImagePath, mappedImage)
+	err = saveMappedImage(outputImagePath, mappedImage)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Image mapped and saved at: " + outputImagePath)
+
+	return nil
 }
 
-func loadImageAndPalette(inputImagePath string) (BoundedImage, Settings) {
-	const paletteAffinity = 0.6
+func (c *ColorfulColor) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var hex string
+	if err := unmarshal(&hex); err != nil {
+		return err
+	}
+	color, err := colorful.Hex(hex)
+	if err != nil {
+		return err
+	}
+	*c = ColorfulColor{color}
+	return nil
+}
 
+func loadSettings(settingsFilePath string) (Settings, error) {
+	rawSettings, err := os.ReadFile(settingsFilePath)
+	if err != nil {
+		return Settings{}, err
+	}
+
+	var settings Settings
+	err = yaml.Unmarshal(rawSettings, &settings)
+	if err != nil {
+		return Settings{}, err
+	}
+
+	return settings, nil
+}
+
+func loadImage(inputImagePath string) (BoundedImage, error) {
 	inputFile, err := os.Open(inputImagePath)
 	if err != nil {
-		fmt.Println("Error opening input image:", err)
-		os.Exit(1)
+		return BoundedImage{}, err
 	}
 	defer inputFile.Close()
 
 	img, _, err := image.Decode(inputFile)
 	if err != nil {
-		fmt.Println("Error decoding input image:", err)
-		os.Exit(1)
-	}
-
-	palette := []string{
-		"#2e3440", "#3b4252", "#434c5e", "#4c566a", "#d8dee9", "#e5e9f0", "#eceff4",
-		"#8fbcbb", "#88c0d0", "#81a1c1", "#5e81ac", "#bf616a", "#d08770", "#ebcb8b",
-		"#a3be8c", "#b48ead",
+		return BoundedImage{}, err
 	}
 
 	boundedImage := BoundedImage{Image: img, Bounds: img.Bounds()}
-	settings := Settings{Palette: parsePalette(palette), PaletteAffinity: paletteAffinity}
 
-	return boundedImage, settings
+	return boundedImage, nil
 }
 
 func parsePalette(palette []string) []colorful.Color {
@@ -110,10 +181,10 @@ func mapAndSetPixelColor(pixelColor color.Color, boundedImage BoundedImage, sett
 	var mappedColor colorful.Color
 
 	for _, c := range settings.Palette {
-		distance := targetLab.DistanceLab(c)
+		distance := targetLab.DistanceLab(c.Color)
 		if distance < minDistance {
 			minDistance = distance
-			mappedColor = c
+			mappedColor = c.Color
 		}
 	}
 
@@ -127,14 +198,14 @@ func mapAndSetPixelColor(pixelColor color.Color, boundedImage BoundedImage, sett
 	mappedColorByColor.Store(pixelColor, adjustedColor)
 }
 
-func saveMappedImage(outputImagePath string, mappedImage image.Image) {
+func saveMappedImage(outputImagePath string, mappedImage image.Image) error {
 	outputImageFile, err := os.Create(outputImagePath)
 	if err != nil {
-		fmt.Println("Error creating output image:", err)
-		os.Exit(1)
+		return err
 	}
 	defer outputImageFile.Close()
 
 	jpeg.Encode(outputImageFile, mappedImage, nil)
-	fmt.Println("Image mapping to palette complete. Output saved to", outputImagePath)
+
+	return nil
 }
