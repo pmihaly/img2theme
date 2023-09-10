@@ -37,6 +37,7 @@ func (c *ColorfulColor) UnmarshalYAML(unmarshal func(interface{}) error) error {
 type Settings struct {
 	Palette         []ColorfulColor `yaml:"palette"`
 	PaletteAffinity float64         `yaml:"palette-affinity"`
+	Cpus            int             `yaml:"cpus"`
 }
 
 func LoadSettingsFromYaml(filePath string) (Settings, error) {
@@ -157,7 +158,11 @@ func mainAction(c *cli.Context) error {
 		return err
 	}
 
-	numCPU := runtime.NumCPU()
+	numCPU := settings.Cpus
+	if numCPU == 0 {
+		numCPU = runtime.NumCPU()
+	}
+
 	var wg sync.WaitGroup
 	rowCh := make(chan int, numCPU)
 
