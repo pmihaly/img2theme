@@ -1,12 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
+	"log"
 	"math"
 	"os"
 	"runtime"
@@ -111,25 +111,13 @@ func (im *ImageMapper) mapImageRows(rowCh chan int) {
 	}
 }
 
-func (im *ImageMapper) SaveAsJpeg(outputJpegPath string) error {
-	outputJpeg, err := os.Create(outputJpegPath)
-	if err != nil {
-		return err
-	}
-	defer outputJpeg.Close()
-
-	jpeg.Encode(outputJpeg, im.MappedImage, nil)
+func (im *ImageMapper) SaveAsJpeg(outputFile *os.File) error {
+	jpeg.Encode(outputFile, im.MappedImage, nil)
 
 	return nil
 }
 
-func loadImage(filePath string) (image.Image, error) {
-	inputFile, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer inputFile.Close()
-
+func loadImageFromFile(inputFile *os.File) (image.Image, error) {
 	img, _, err := image.Decode(inputFile)
 	if err != nil {
 		return nil, err
@@ -139,16 +127,14 @@ func loadImage(filePath string) (image.Image, error) {
 }
 
 func mainAction(c *cli.Context) error {
-	inputImagePath := c.String("input")
-	outputImagePath := c.String("output")
-	settingsFilePath := c.String("settings")
+	settingsFilePath := c.Args().First()
 
 	settings, err := LoadSettingsFromYaml(settingsFilePath)
 	if err != nil {
 		return err
 	}
 
-	loadedImage, err := loadImage(inputImagePath)
+	loadedImage, err := loadImageFromFile(os.Stdin)
 	if err != nil {
 		return err
 	}
@@ -180,44 +166,26 @@ func mainAction(c *cli.Context) error {
 	close(rowCh)
 	wg.Wait()
 
-	err = mapper.SaveAsJpeg(outputImagePath)
-
+	err = mapper.SaveAsJpeg(os.Stdout)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Image mapped and saved at: " + outputImagePath)
+	log.Println("Image mapped and written to stdout")
 
 	return nil
 }
 
 func main() {
 	app := &cli.App{
-		Name:  "ImageMapper",
-		Usage: "Map colors in an image to a specified palette.",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "input",
-				Value: "input.jpg",
-				Usage: "Input image file path",
-			},
-			&cli.StringFlag{
-				Name:  "output",
-				Value: "output.jpg",
-				Usage: "Output image file path",
-			},
-			&cli.StringFlag{
-				Name:  "settings",
-				Value: "settings.yaml",
-				Usage: "Settings YAML file path",
-			},
-		},
-		Action: mainAction,
+		Name:      "img2theme",
+		Usage:     "Map colors in an image to a specified palette.\nExample usage: img2theme settings.yaml <input.jpg >output.jpg",
+		ArgsUsage: "<settings.yaml>",
+		Action:    mainAction,
 	}
 
 	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Println(err)
-		cli.Exit(err, 1)
+		log.Fatal(err)
 	}
 }
