@@ -12,6 +12,10 @@
         deps = with pkgs; [
           go
         ];
+        devDeps = with pkgs; [
+          hyperfine
+          timg
+        ];
       in
       {
         packages.default = pkgs.buildGoModule {
@@ -32,7 +36,7 @@
 
         devShell = nixpkgs.legacyPackages.${system}.mkShell {
           inherit (self.checks.${system}.pre-commit-check) shellHook;
-          buildInputs = deps;
+          buildInputs = deps ++ devDeps;
         };
       });
 }
