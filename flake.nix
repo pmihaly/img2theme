@@ -15,6 +15,8 @@
         devDeps = with pkgs; [
           hyperfine
           timg
+          vhs
+          bat
         ];
       in
       {
