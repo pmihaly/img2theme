@@ -90,7 +90,7 @@ cp img2theme ~/.local/bin
 - [x] Quantization - pixel-by-pixel mapping each colors to the closest color in the palette
 - [x] Usable CLI interface
 - [x] Pretty readme
-- [ ] Split up `main.go`
+- [x] Split up `main.go`
 - [ ] Adjustable dithering to smooth out gradients
 - [ ] Add webp format
 - [ ] Output format should be the same as the input format
