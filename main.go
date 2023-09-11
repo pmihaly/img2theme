@@ -73,7 +73,7 @@ func NewImageMapper(settings Settings, loadedImage image.Image) (*ImageMapper, e
 	return mapper, nil
 }
 
-func (im *ImageMapper) MapPixelToPalette(x, y int) {
+func (im *ImageMapper) QuantizePixelToPalette(x, y int) {
 	currentPixelColor := im.LoadedImage.At(x, y)
 
 	if mappedColor, ok := im.MappedColorByColor.Load(currentPixelColor); ok {
@@ -103,10 +103,10 @@ func (im *ImageMapper) MapPixelToPalette(x, y int) {
 	im.MappedColorByColor.Store(currentPixelColor, adjustedColor)
 }
 
-func (im *ImageMapper) mapImageRows(rowCh chan int) {
+func (im *ImageMapper) QuantizeColorsToPalette(rowCh chan int) {
 	for row := range rowCh {
 		for x := im.LoadedImage.Bounds().Min.X; x < im.LoadedImage.Bounds().Max.X; x++ {
-			im.MapPixelToPalette(x, row)
+			im.QuantizePixelToPalette(x, row)
 		}
 	}
 }
@@ -150,7 +150,7 @@ func mainAction(c *cli.Context) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			mapper.mapImageRows(rowCh)
+			mapper.QuantizeColorsToPalette(rowCh)
 		}()
 	}
 
