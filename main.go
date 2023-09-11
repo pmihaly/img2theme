@@ -111,12 +111,6 @@ func (im *ImageMapper) mapImageRows(rowCh chan int) {
 	}
 }
 
-func (im *ImageMapper) SaveAsJpeg(outputFile *os.File) error {
-	jpeg.Encode(outputFile, im.MappedImage, nil)
-
-	return nil
-}
-
 func loadImageFromFile(inputFile *os.File) (image.Image, error) {
 	img, _, err := image.Decode(inputFile)
 	if err != nil {
@@ -166,10 +160,7 @@ func mainAction(c *cli.Context) error {
 	close(rowCh)
 	wg.Wait()
 
-	err = mapper.SaveAsJpeg(os.Stdout)
-	if err != nil {
-		return err
-	}
+	jpeg.Encode(os.Stdout, mapper.MappedImage, nil)
 
 	log.Println("Image mapped and written to stdout")
 
