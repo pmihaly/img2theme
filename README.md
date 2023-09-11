@@ -92,6 +92,8 @@ cp img2theme ~/.local/bin
 - [x] Pretty readme
 - [ ] Split up `main.go`
 - [ ] Adjustable dithering to smooth out gradients
+- [ ] Add webp format
+- [ ] Output format should be the same as the input format
 - [ ] [Solid color filter](https://github.com/lucasb-eyer/go-colorful#blending-colors) with adjustable alpha (`0` - no filter)
 - [ ] Map over the same image with multiple settings
   - use user defined anchors for invariants
