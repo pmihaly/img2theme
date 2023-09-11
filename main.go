@@ -103,12 +103,14 @@ func (im *ImageMapper) QuantizePixelToPalette(x, y int) {
 	im.MappedColorByColor.Store(currentPixelColor, adjustedColor)
 }
 
-func (im *ImageMapper) QuantizeColorsToPalette(rowCh chan int) {
+func (im *ImageMapper) QuantizeColorsToPalette(rowCh chan int) *ImageMapper {
 	for row := range rowCh {
 		for x := im.LoadedImage.Bounds().Min.X; x < im.LoadedImage.Bounds().Max.X; x++ {
 			im.QuantizePixelToPalette(x, row)
 		}
 	}
+
+	return im
 }
 
 func loadImageFromFile(inputFile *os.File) (image.Image, error) {
